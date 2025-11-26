@@ -9,12 +9,12 @@ This project provides a Python environment with full support for Russian GOST cr
 ## Sources
 
 - **GOST Engine**: [gost-engine](https://github.com/gost-engine/engine) - Reference implementation of GOST cryptographic algorithms for OpenSSL
-- **Python**: [CPython 3.12.8](https://www.python.org/downloads/release/python-3128/) - Official Python distribution
+- **Python**: [CPython 3.12.0](https://www.python.org/downloads/release/python-3120/) - Official Python distribution
 - **Base Image**: Alpine Linux (optimized GOST engine build)
 
 ## Features
 
-- ✅ Python 3.12.8 compiled with OpenSSL 3.5.4
+- ✅ Python 3.12.0 compiled with OpenSSL 3.5.4
 - ✅ Full GOST cryptographic support
 - ✅ Pre-installed packages: `requests`, `urllib3`
 - ✅ Utilities: `curl`, `gostsum`, `gost12sum`
@@ -46,11 +46,14 @@ docker build -t python-gost:latest .
 
 ### Build Arguments
 
-- `PYTHON_VERSION` - Python version to build (default: 3.12.8)
+- `PYTHON_VERSION` - Python version to build (default: 3.12.0)
+- `GOST_ENGINE_REPO` - GOST engine repository URL (default: https://github.com/gost-engine/engine)
+- `GOST_ENGINE_BRANCH` - GOST engine branch or tag (default: master)
 
 Example:
 ```bash
 docker build --build-arg PYTHON_VERSION=3.11.10 -t python-gost:3.11 .
+docker build --build-arg GOST_ENGINE_BRANCH=v3.0.0 -t python-gost:latest .
 ```
 
 ## Usage
@@ -206,7 +209,7 @@ This project follows the licensing of its components:
 
 ## Version History
 
-- **1.0.0** - Initial release with Python 3.12.8 and OpenSSL 3.5.4
+- **1.0.0** - Initial release with Python 3.12.0 and OpenSSL 3.5.4
 
 
 

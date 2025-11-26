@@ -16,11 +16,18 @@ RUN apk update \
       sqlite-dev \
       xz-dev \
       zlib-dev \
-      wget
+      wget \
+      git
 
-ARG PYTHON_VERSION=3.12.8
+ARG PYTHON_VERSION=3.12.0
+ARG GOST_ENGINE_REPO=https://github.com/gost-engine/engine
+ARG GOST_ENGINE_BRANCH=master
 
 WORKDIR /usr/local/src
+
+# Clone GOST engine sources
+RUN git clone --depth 1 --branch ${GOST_ENGINE_BRANCH} ${GOST_ENGINE_REPO}.git engine-sources \
+    && rm -rf engine-sources/.git
 
 RUN wget --no-check-certificate https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
     && tar -xf Python-${PYTHON_VERSION}.tar.xz \
@@ -66,7 +73,7 @@ WORKDIR /app
 
 LABEL maintainer="GOST Engine Community"
 LABEL description="Python with GOST cryptographic support for OpenSSL"
-LABEL python.version="3.12.8"
+LABEL python.version="3.12.0"
 LABEL openssl.version="3.5.4"
 
 
