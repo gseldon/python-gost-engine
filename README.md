@@ -206,6 +206,8 @@ This project follows the licensing of its components:
 - [Russian Cryptographic Standards](https://tc26.ru/)
 - [OpenSSL Documentation](https://www.openssl.org/docs/)
 - [Python SSL Module](https://docs.python.org/3/library/ssl.html)
+- [TK26 TLS Recommendations](https://cryptopro.ru/sites/default/files/products/tls/tk26tls.pdf) - Recommendations for using GOST 28147-89 encryption algorithms in TLS protocol
+- [TLS 1.2 and New GOST (Habr)](https://habr.com/ru/articles/339978/) - Overview of GOST cryptographic algorithms in TLS 1.2 protocol
 
 ## Version History
 
