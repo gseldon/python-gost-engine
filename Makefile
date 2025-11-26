@@ -1,6 +1,6 @@
 .PHONY: build test clean run shell
 
-IMAGE_NAME = python-gost
+IMAGE_NAME = python-gost-engine
 TAG = latest
 
 build:

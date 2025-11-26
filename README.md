@@ -40,8 +40,8 @@ docker build -f docker/Dockerfile.alpine -t engine:alpine-optimized .
 
 2. Build Python image:
 ```bash
-cd python-gost
-docker build -t python-gost:latest .
+cd python-gost-engine
+docker build -t python-gost-engine:latest .
 ```
 
 ### Build Arguments
@@ -52,8 +52,8 @@ docker build -t python-gost:latest .
 
 Example:
 ```bash
-docker build --build-arg PYTHON_VERSION=3.11.10 -t python-gost:3.11 .
-docker build --build-arg GOST_ENGINE_BRANCH=v3.0.0 -t python-gost:latest .
+docker build --build-arg PYTHON_VERSION=3.11.10 -t python-gost-engine:3.11 .
+docker build --build-arg GOST_ENGINE_BRANCH=v3.0.0 -t python-gost-engine:latest .
 ```
 
 ## Usage
@@ -62,23 +62,23 @@ docker build --build-arg GOST_ENGINE_BRANCH=v3.0.0 -t python-gost:latest .
 
 ```bash
 # Run Python interpreter
-docker run --rm -it python-gost python3
+docker run --rm -it python-gost-engine python3
 
 # Check Python version
-docker run --rm python-gost python3 --version
+docker run --rm python-gost-engine python3 --version
 
 # Check OpenSSL version
-docker run --rm python-gost python3 -c "import ssl; print(ssl.OPENSSL_VERSION)"
+docker run --rm python-gost-engine python3 -c "import ssl; print(ssl.OPENSSL_VERSION)"
 ```
 
 ### Running Scripts
 
 ```bash
 # Run a Python script
-docker run --rm -v $(pwd):/app python-gost python3 script.py
+docker run --rm -v $(pwd):/app python-gost-engine python3 script.py
 
 # Interactive mode with volume mount
-docker run --rm -it -v $(pwd):/app python-gost bash
+docker run --rm -it -v $(pwd):/app python-gost-engine bash
 ```
 
 ### Accessing GOST-Protected Websites
@@ -108,10 +108,10 @@ Run the test suite:
 
 ```bash
 # Run all tests
-docker run --rm -v $(pwd)/tests:/tests python-gost python3 -m pytest /tests
+docker run --rm -v $(pwd)/tests:/tests python-gost-engine python3 -m pytest /tests
 
 # Run specific test
-docker run --rm python-gost python3 tests/test_gost.py
+docker run --rm python-gost-engine python3 tests/test_gost.py
 ```
 
 ## Architecture
@@ -131,7 +131,7 @@ docker run --rm python-gost python3 tests/test_gost.py
 ### Directory Structure
 
 ```
-python-gost/
+python-gost-engine/
 ├── Dockerfile           # Multi-stage build definition
 ├── README.md           # This file
 ├── tests/              # Test suite
