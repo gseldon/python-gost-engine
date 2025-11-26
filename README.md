@@ -34,7 +34,7 @@ This project provides a Python environment with full support for Russian GOST cr
 
 1. Build the base GOST engine image:
 ```bash
-cd ..
+cd ../engine
 docker build -f docker/Dockerfile.alpine -t engine:alpine-optimized .
 ```
 
