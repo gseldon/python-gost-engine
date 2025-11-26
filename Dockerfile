@@ -71,7 +71,7 @@ ENV OPENSSL_CONF=/etc/ssl/openssl.cnf
 
 WORKDIR /app
 
-LABEL maintainer="GOST Engine Community"
+LABEL maintainer="36692159+gseldon@users.noreply.github.com"
 LABEL description="Python with GOST cryptographic support for OpenSSL"
 LABEL python.version="3.12.0"
 LABEL openssl.version="3.5.4"
