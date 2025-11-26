@@ -41,7 +41,9 @@ Docker образ с модифицированным Python, собранным
 
 ## Сборка
 
-### Предварительные требования
+### Сборка с использованием Docker
+
+#### Предварительные требования
 
 1. Соберите базовый образ GOST engine:
 ```bash
@@ -55,7 +57,7 @@ cd python-gost-engine
 docker build -t python-gost-engine:latest .
 ```
 
-### Аргументы сборки
+#### Аргументы сборки
 
 - `PYTHON_VERSION` - Версия Python для сборки (по умолчанию: 3.12.0)
 - `GOST_ENGINE_REPO` - URL репозитория GOST engine (по умолчанию: https://github.com/gost-engine/engine)
@@ -66,6 +68,110 @@ docker build -t python-gost-engine:latest .
 docker build --build-arg PYTHON_VERSION=3.11.10 -t python-gost-engine:3.11 .
 docker build --build-arg GOST_ENGINE_BRANCH=v3.0.0 -t python-gost-engine:latest .
 ```
+
+### Сборка на Ubuntu (без Docker)
+
+Если Docker не требуется, можно собрать Python с поддержкой GOST напрямую на Ubuntu.
+
+#### Предварительные требования
+
+Установите необходимые зависимости:
+```bash
+sudo apt update
+sudo apt install -y \
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    libssl-dev \
+    libbz2-dev \
+    libexpat1-dev \
+    libgdbm-dev \
+    libffi-dev \
+    libncurses5-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    liblzma-dev \
+    zlib1g-dev \
+    wget \
+    git \
+    cmake \
+    curl
+```
+
+#### Сборка GOST Engine
+
+1. Клонируйте репозиторий gost-engine:
+```bash
+cd /usr/local/src
+sudo git clone --depth 1 https://github.com/gost-engine/engine.git
+cd engine
+```
+
+2. Соберите и установите GOST engine:
+```bash
+sudo mkdir build && cd build
+sudo cmake \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+    -DOPENSSL_ENGINES_DIR=/usr/lib/x86_64-linux-gnu/engines-3 \
+    ..
+sudo cmake --build . --parallel $(nproc) --target install
+sudo cp bin/gostsum bin/gost12sum /usr/local/bin
+```
+
+3. Настройте OpenSSL для использования GOST engine:
+```bash
+sudo cp example.conf /etc/ssl/gost.cnf
+sudo sed -i "s|dynamic_path\s*=.*$|dynamic_path = /usr/lib/x86_64-linux-gnu/engines-3/gost.so|" /etc/ssl/gost.cnf
+sudo sed -i "11i .include /etc/ssl/gost.cnf" /etc/ssl/openssl.cnf
+```
+
+#### Сборка Python
+
+1. Скачайте и распакуйте исходники Python:
+```bash
+cd /usr/local/src
+PYTHON_VERSION=3.12.0
+sudo wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz
+sudo tar -xf Python-${PYTHON_VERSION}.tar.xz
+cd Python-${PYTHON_VERSION}
+```
+
+2. Соберите Python с поддержкой OpenSSL и GOST:
+```bash
+sudo ./configure \
+    --prefix=/usr/local \
+    --enable-optimizations \
+    --with-openssl=/usr \
+    --with-openssl-rpath=auto \
+    --enable-shared \
+    LDFLAGS="-Wl,-rpath /usr/local/lib"
+
+sudo make -j $(nproc)
+sudo make install
+```
+
+3. Настройте переменные окружения:
+```bash
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+export OPENSSL_CONF=/etc/ssl/openssl.cnf
+```
+
+4. Установите дополнительные пакеты (опционально):
+```bash
+/usr/local/bin/python3 -m pip install --upgrade pip
+/usr/local/bin/python3 -m pip install requests urllib3
+```
+
+5. Проверьте установку:
+```bash
+/usr/local/bin/python3 --version
+/usr/local/bin/python3 -c "import ssl; print(ssl.OPENSSL_VERSION)"
+openssl engine -t gost
+```
+
+**Примечание**: После сборки убедитесь, что `/usr/local/bin` находится в `PATH`, или используйте полный путь к Python.
 
 ## Использование
 
