@@ -1,4 +1,4 @@
-# Python с GOST Cryptographic Engine
+# Python с поддержкой GOST Cryptographic Engine
 
 Docker образ с Python, собранным на базе OpenSSL с поддержкой криптографических алгоритмов GOST.
 
