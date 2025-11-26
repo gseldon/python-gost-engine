@@ -77,8 +77,8 @@ docker build --build-arg GOST_ENGINE_BRANCH=v3.0.0 -t python-gost-engine:latest 
 
 Установите необходимые зависимости:
 ```bash
-sudo apt update
-sudo apt install -y \
+sudo apt-get update
+sudo apt-get install -y \
     build-essential \
     gcc \
     g++ \
