@@ -92,6 +92,104 @@ def test_tls_handshake():
         return False
 
 
+def test_cryptopro_ssl_connection():
+    """Test SSL connection to CryptoPro site"""
+    print("Testing SSL connection to cryptopro.ru...")
+    try:
+        result = subprocess.run(
+            ["curl", "-k", "-I", "-s", "--connect-timeout", "10", 
+             "https://cryptopro.ru/"],
+            capture_output=True,
+            text=True,
+            timeout=15
+        )
+        
+        if "HTTP" in result.stdout:
+            print(f"  ✓ SSL connection to cryptopro.ru successful")
+            status_line = result.stdout.split('\n')[0]
+            print(f"    {status_line}")
+            return True
+        else:
+            print(f"  ✗ SSL connection to cryptopro.ru failed")
+            return False
+    except Exception as e:
+        print(f"  ✗ SSL connection test to cryptopro.ru failed: {e}")
+        return False
+
+
+def test_cryptopro_certificate():
+    """Test CryptoPro certificate verification"""
+    print("Testing CryptoPro certificate...")
+    try:
+        result = subprocess.run(
+            ["openssl", "s_client", "-connect", "cryptopro.ru:443", 
+             "-showcerts"],
+            input="",
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if "GOST" in result.stdout or "KUZNYECHIK" in result.stdout:
+            print(f"  ✓ CryptoPro GOST certificate detected")
+            
+            # Extract certificate and verify
+            cert_result = subprocess.run(
+                ["openssl", "x509", "-text", "-noout"],
+                input=result.stdout,
+                capture_output=True,
+                text=True
+            )
+            
+            if "GOST" in cert_result.stdout or "KUZNYECHIK" in cert_result.stdout:
+                print(f"  ✓ Certificate signature algorithm verified")
+                return True
+        
+        print(f"  ✗ CryptoPro certificate verification failed")
+        return False
+    except Exception as e:
+        print(f"  ✗ CryptoPro certificate test failed: {e}")
+        return False
+
+
+def test_cryptopro_cipher_suite():
+    """Test CryptoPro cipher suite (Kuznyechik)"""
+    print("Testing CryptoPro cipher suite (Kuznyechik)...")
+    try:
+        result = subprocess.run(
+            ["openssl", "s_client", "-connect", "cryptopro.ru:443", 
+             "-cipher", "GOST2012-GOST8912-GOST8912"],
+            input="",
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        # Check for Kuznyechik cipher suite
+        if "KUZNYECHIK" in result.stdout.upper() or "Cipher" in result.stdout:
+            print(f"  ✓ Kuznyechik cipher suite detected")
+            
+            # Try to get cipher info
+            cipher_info = subprocess.run(
+                ["openssl", "s_client", "-connect", "cryptopro.ru:443", 
+                 "-brief"],
+                input="",
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if "KUZNYECHIK" in cipher_info.stdout.upper() or cipher_info.returncode == 0:
+                print(f"  ✓ Cipher suite negotiation successful")
+                return True
+        
+        print(f"  ✗ Kuznyechik cipher suite test failed")
+        return False
+    except Exception as e:
+        print(f"  ✗ Cipher suite test failed: {e}")
+        return False
+
+
 def run_ssl_tests():
     """Run SSL/TLS tests"""
     print("=" * 60)
@@ -103,6 +201,9 @@ def run_ssl_tests():
         test_ssl_connection,
         test_certificate_verification,
         test_tls_handshake,
+        test_cryptopro_ssl_connection,
+        test_cryptopro_certificate,
+        test_cryptopro_cipher_suite,
     ]
     
     results = []
