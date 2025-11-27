@@ -21,16 +21,15 @@ Docker образ с модифицированным Python, собранным
 
 - **GOST Engine**: [gost-engine](https://github.com/gost-engine/engine) - Эталонная реализация криптографических алгоритмов GOST для OpenSSL
 - **Python**: [CPython 3.12.0](https://www.python.org/downloads/release/python-3120/) - Официальная дистрибуция Python
-- **Базовый образ**: Alpine Linux (оптимизированная сборка GOST engine)
+- **Базовый образ**: Alpine Linux
 
 ## Возможности
 
 - ✅ Python 3.12.0 скомпилирован с OpenSSL 3.5.4
 - ✅ Полная поддержка криптографии GOST
 - ✅ Предустановленные пакеты: `requests`, `urllib3`
-- ✅ Утилиты: `curl`, `gostsum`, `gost12sum`
 - ✅ Оптимизированная многоэтапная сборка
-- ✅ Небольшой размер образа: ~312MB
+- ✅ Небольшой размер образа: ~433MB
 
 ## Поддерживаемые алгоритмы GOST
 
@@ -43,15 +42,9 @@ Docker образ с модифицированным Python, собранным
 
 ### Сборка с использованием Docker
 
-#### Предварительные требования
+#### Сборка образа
 
-1. Соберите базовый образ GOST engine:
-```bash
-cd ../engine
-docker build -f docker/Dockerfile.alpine -t engine:alpine-optimized .
-```
-
-2. Соберите образ Python:
+Соберите образ Python:
 ```bash
 cd python-gost-engine
 docker build -t python-gost-engine:latest .
@@ -96,7 +89,6 @@ sudo apt-get install -y \
     wget \
     git \
     cmake \
-    curl
 ```
 
 #### Сборка GOST Engine
@@ -198,23 +190,17 @@ docker run --rm -v $(pwd):/app python-gost-engine python3 script.py
 docker run --rm -it -v $(pwd):/app python-gost-engine bash
 ```
 
-### Доступ к сайтам с защитой GOST
+### Использование requests для работы с сайтами
 
-Из-за ограничений модуля SSL Python с GOST, используйте `curl` через subprocess:
+Для работы с сайтами используйте библиотеку `requests`:
 
 ```python
-import subprocess
-import html
+import requests
 
-# Доступ к сайту с защитой GOST
-result = subprocess.run(
-    ["curl", "-k", "-L", "-s", "https://example-gost-site.ru/"],
-    capture_output=True,
-    text=True
-)
-
-content = html.unescape(result.stdout)
-print(content)
+# Запрос к сайту
+response = requests.get('https://example.com', verify=False, timeout=10)
+print(response.status_code)
+print(response.text)
 ```
 
 См. директорию `examples/` для дополнительных примеров.
@@ -224,11 +210,14 @@ print(content)
 Запустите набор тестов:
 
 ```bash
-# Запустить все тесты
-docker run --rm -v $(pwd)/tests:/tests python-gost-engine python3 -m pytest /tests
+# Запустить тесты с requests.get()
+docker run --rm -v $(pwd)/tests:/app/tests python-gost-engine python3 /app/tests/test_requests.py
 
-# Запустить конкретный тест
-docker run --rm python-gost-engine python3 tests/test_gost.py
+# Запустить тесты SSL/TLS
+docker run --rm -v $(pwd)/tests:/app/tests python-gost-engine python3 /app/tests/test_ssl.py
+
+# Запустить тесты GOST функциональности
+docker run --rm -v $(pwd)/tests:/app/tests python-gost-engine python3 /app/tests/test_gost.py
 ```
 
 ## Архитектура
@@ -253,11 +242,13 @@ python-gost-engine/
 ├── README.md           # Этот файл
 ├── tests/              # Набор тестов
 │   ├── test_gost.py   # Тесты функциональности GOST
-│   └── test_ssl.py    # Тесты SSL/TLS
+│   ├── test_ssl.py    # Тесты SSL/TLS
+│   └── test_requests.py  # Тесты с requests.get()
 └── examples/          # Примеры использования
     ├── basic_usage.py
     ├── gost_site.py
-    └── certificate_check.py
+    ├── certificate_check.py
+    └── pyopenssl_gost.py  # Пример использования pyOpenSSL с GOST engine
 ```
 
 ## Переменные окружения
@@ -267,15 +258,21 @@ python-gost-engine/
 
 ## Ограничения
 
+- **Python ssl модуль не использует GOST engine автоматически**: 
+  - Python был собран с `--with-openssl=/usr`, что означает использование системного OpenSSL с поддержкой GOST engine
+  - Однако Python `ssl` модуль создает свой собственный SSL_CTX при вызове `ssl.create_default_context()`, который не наследует загруженный GOST engine
+  - В отличие от `curl` и `openssl s_client`, которые автоматически читают `OPENSSL_CONF` и загружают GOST engine при запуске
+  - Это означает, что:
+    - `curl` и `openssl s_client` работают с GOST сайтами (например, `dss.uc-em.ru`)
+    - `requests.get()` и Python `ssl` модуль не могут подключиться к сайтам, которые используют только GOST cipher suites, даже если GOST engine загружен через ctypes
+    - Для работы с такими сайтами через Python требуется использование `subprocess` с `curl` или использование `pyOpenSSL` для создания SSL контекста с явной загрузкой GOST engine
 - Прямые HTTPS запросы через модуль `ssl` Python к сайтам только с GOST требуют дополнительной настройки SSL контекста
-- Рекомендуемый подход: Использовать `subprocess` с `curl` для сайтов с GOST
 - Некоторые Python пакеты могут не работать с сертификатами GOST без пользовательских адаптеров
 
 ## Производительность
 
 - **Время сборки**: ~6 минут (с оптимизациями)
-- **Размер образа**: 312 MB
-- **Базовый образ**: 12.8 MB (оптимизированный GOST engine)
+- **Размер образа**: ~433 MB
 
 ## Вопросы безопасности
 
@@ -288,11 +285,60 @@ python-gost-engine/
 
 ### Проблемы с модулем SSL Python
 
-Если вы столкнулись с ошибками SSL на сайтах с GOST:
+**Почему curl работает, а requests.get() нет?**
+
+`curl` и `openssl s_client` автоматически читают `OPENSSL_CONF` и загружают GOST engine при запуске. Python `ssl` модуль не делает этого автоматически при создании SSL контекста, поэтому не может использовать GOST cipher suites.
+
+**Решения:**
+
+1. **Использовать subprocess с curl** (рекомендуется для сайтов только с GOST):
 ```python
-# Используйте subprocess с curl вместо этого
 import subprocess
-result = subprocess.run(['curl', '-k', 'https://site.ru'], capture_output=True)
+result = subprocess.run(['curl', '-k', 'https://dss.uc-em.ru/'], 
+                       capture_output=True, text=True)
+```
+
+2. **Использовать pyOpenSSL для явной загрузки GOST engine**:
+```python
+# Требует установки: pip install pyOpenSSL cryptography
+from OpenSSL import SSL
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.contrib.pyopenssl import PyOpenSSLContext
+
+def load_gost_engine():
+    """Загружает GOST engine через pyOpenSSL"""
+    SSL._lib.OPENSSL_config(None)  # Загружает OPENSSL_CONF
+    SSL._lib.ENGINE_load_builtin_engines()
+    engine = SSL._lib.ENGINE_by_id(b'gost')
+    if engine:
+        SSL._lib.ENGINE_init(engine)
+        SSL._lib.ENGINE_set_default(engine, 0xFFFF)  # ALL
+        return True
+    return False
+
+class GOSTAdapter(HTTPAdapter):
+    """HTTPAdapter с поддержкой GOST"""
+    def init_poolmanager(self, *args, **kwargs):
+        load_gost_engine()  # Загружаем GOST engine
+        ctx = SSL.Context(SSL.TLS_CLIENT_METHOD)
+        ctx.set_verify(SSL.VERIFY_NONE, None)
+        kwargs['ssl_context'] = PyOpenSSLContext(ctx)
+        return super().init_poolmanager(*args, **kwargs)
+
+session = requests.Session()
+session.mount('https://', GOSTAdapter())
+response = session.get('https://dss.uc-em.ru/', verify=False, timeout=10)
+print(f"Status: {response.status_code}")
+```
+
+Полный рабочий пример см. в `examples/pyopenssl_gost.py`
+
+3. **Для сайтов, которые поддерживают обычные и GOST cipher suites** (например, `cryptopro.ru`):
+```python
+# requests.get() работает, но может использовать не-GOST cipher
+import requests
+response = requests.get('https://cryptopro.ru', verify=False, timeout=10)
 ```
 
 ### Ошибки "Модуль не найден"
