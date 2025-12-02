@@ -1,14 +1,30 @@
-FROM alpine:latest AS builder
+ARG ALPINE_VERSION=3
+ARG PYTHON_VERSION=3.12
 
-RUN apk update \
-    && apk add --no-cache --virtual .build-deps \
+# Базовая стадия с общими runtime пакетами
+FROM alpine:${ALPINE_VERSION} AS base
+# apk update без удаления кеша для переиспользования между стадиями
+RUN apk update && apk add --no-cache \
+      openssl \
+      libffi \
+      expat \
+      gdbm \
+      readline \
+      sqlite-libs \
+      xz-libs \
+      bzip2 \
+      ncurses-libs
+
+# Builder стадия для сборки
+FROM base AS builder
+# Установка build-зависимостей
+RUN apk add --no-cache --virtual .build-deps \
       gcc \
       g++ \
       make \
       cmake \
       musl-dev \
       openssl-dev \
-      openssl \
       bzip2-dev \
       expat-dev \
       gdbm-dev \
@@ -22,7 +38,6 @@ RUN apk update \
       git \
       linux-headers
 
-ARG PYTHON_VERSION=3.12.0
 ARG GOST_ENGINE_REPO=https://github.com/gost-engine/engine
 ARG GOST_ENGINE_BRANCH=master
 
@@ -42,10 +57,8 @@ RUN git clone --recursive --depth 1 --branch ${GOST_ENGINE_BRANCH} ${GOST_ENGINE
     && cmake --build . --parallel $(nproc) \
     && cmake --install . \
     && cp bin/gostsum bin/gost12sum /usr/local/bin/ 2>/dev/null || true \
-    && cd /usr/local/src
-
-# Configure OpenSSL for GOST engine
-RUN mkdir -p /etc/ssl \
+    && cd /usr/local/src \
+    && mkdir -p /etc/ssl \
     && if [ -f /usr/local/src/engine-sources/example.conf ]; then \
         cp /usr/local/src/engine-sources/example.conf /etc/ssl/gost.cnf; \
         sed -i "s|dynamic_path\s*=.*$|dynamic_path = /usr/lib/engines-3/gost.so|" /etc/ssl/gost.cnf || true; \
@@ -68,66 +81,63 @@ RUN mkdir -p /etc/ssl \
     fi \
     && if [ -f /etc/ssl/openssl.cnf ] && ! grep -q "gost.cnf" /etc/ssl/openssl.cnf; then \
         sed -i "11i .include /etc/ssl/gost.cnf" /etc/ssl/openssl.cnf || true; \
-    fi
+    fi \
+    && rm -rf engine-sources
 
-# Build Python with GOST support
-RUN wget --no-check-certificate https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
-    && tar -xf Python-${PYTHON_VERSION}.tar.xz \
-    && cd Python-${PYTHON_VERSION} \
-    && ./configure \
-        --prefix=/usr/local \
-        --enable-optimizations \
-        --with-openssl=/usr \
-        --with-openssl-rpath=auto \
-        --enable-shared \
-        LDFLAGS="-Wl,-rpath /usr/local/lib" \
-    && make -j $(nproc) \
-    && make install \
-    && cd / \
-    && rm -rf /usr/local/src/Python-${PYTHON_VERSION}*
+# Финальная стадия - используем официальный образ Python
+FROM python:${PYTHON_VERSION}-alpine AS final
 
-RUN python3 -m pip install --no-cache-dir requests urllib3
+# Объявляем ARG для финальной стадии (не наследуются автоматически)
+ARG ALPINE_VERSION=3
+ARG PYTHON_VERSION=3.12
+ARG OPENSSL_VERSION
+ARG GOST_HTTP_VERSION=0.1.0
 
-FROM alpine:latest
-
-RUN apk update \
-    && apk add --no-cache \
-      curl \
-      openssl \
-      libffi \
-      expat \
-      gdbm \
-      readline \
-      sqlite-libs \
-      xz-libs \
-      bzip2 \
-      ncurses-libs \
+# Установка runtime зависимостей и очистка кеша только в финальной стадии
+RUN apk add --no-cache curl openssl \
     && rm -rf /var/cache/apk/*
 
-COPY --from=builder /usr/local/ /usr/local/
-
-# Copy GOST engine files and configuration
-RUN mkdir -p /usr/lib/engines-3 /etc/ssl
+# Копирование GOST engine из builder
 COPY --from=builder /usr/lib/engines-3/ /usr/lib/engines-3/
 COPY --from=builder /etc/ssl/gost.cnf /etc/ssl/gost.cnf
 
-# Ensure OpenSSL configuration includes GOST engine
-RUN if [ -f /etc/ssl/openssl.cnf ] && ! grep -q "gost.cnf" /etc/ssl/openssl.cnf; then \
+# Настройка OpenSSL конфигурации
+RUN mkdir -p /usr/lib/engines-3 /etc/ssl \
+    && if [ -f /etc/ssl/openssl.cnf ] && ! grep -q "gost.cnf" /etc/ssl/openssl.cnf; then \
         sed -i "11i .include /etc/ssl/gost.cnf" /etc/ssl/openssl.cnf || true; \
     fi
 
-RUN ln -sf /usr/local/bin/python3 /usr/local/bin/python \
-    && ln -sf /usr/local/bin/pip3 /usr/local/bin/pip
-
-ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV OPENSSL_CONF=/etc/ssl/openssl.cnf
+
+# Установка Python пакетов (pyOpenSSL, cryptography, requests, urllib3)
+# Определяем версию pyOpenSSL для LABEL
+RUN python3 -m pip install --no-cache-dir \
+    requests \
+    urllib3 \
+    pyOpenSSL \
+    cryptography \
+    && python3 -c "import OpenSSL; print(OpenSSL.__version__)" > /tmp/pyopenssl_version.txt
+
+# Установка gost_http библиотеки и проверка
+ARG GOST_HTTP_VERSION
+ENV GOST_HTTP_VERSION=${GOST_HTTP_VERSION}
+COPY gost_http/ /tmp/gost_http/
+RUN PYTHON_SITE_PACKAGES=$(python3 -c "import site; print(site.getsitepackages()[0])") && \
+    echo "Python site-packages: $PYTHON_SITE_PACKAGES" && \
+    mkdir -p "$PYTHON_SITE_PACKAGES" && \
+    cp -r /tmp/gost_http "$PYTHON_SITE_PACKAGES/" && \
+    rm -rf /tmp/gost_http && \
+    echo "Installed gost_http version: $GOST_HTTP_VERSION" && \
+    python3 -c "import gost_http; print('✓ gost_http installed successfully')" && \
+    python3 -c "from gost_http import requests_gost; print('✓ requests_gost imported successfully')"
 
 WORKDIR /app
 
 LABEL maintainer="36692159+gseldon@users.noreply.github.com"
 LABEL description="Python with GOST cryptographic support for OpenSSL"
-LABEL python.version="3.12.0"
-LABEL openssl.version="3.5.4"
+LABEL python.version="${PYTHON_VERSION}"
+LABEL alpine.version="${ALPINE_VERSION}"
+LABEL gost_http.version="${GOST_HTTP_VERSION}"
 
 
 

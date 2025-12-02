@@ -104,6 +104,29 @@ ssl_context.verify_mode = std_ssl.CERT_NONE
 
 ---
 
+### 9. Python C Extension для загрузки GOST engine (ЭКСПЕРИМЕНТАЛЬНЫЙ - УДАЛЕН)
+
+**Описание:** Создание C extension модуля, который загружает GOST engine через OpenSSL API.
+
+**Статус:** ❌ **УДАЛЕН** - экспериментальный код, который не решал основную проблему
+
+**Реализация (историческая справка):**
+- Был создан модуль `gost_engine_loader` в директории `gost_engine_loader/`
+- Использовал OpenSSL ENGINE API для загрузки GOST engine
+- Предоставлял Python функции: `load_gost_engine()` и `is_gost_engine_loaded()`
+
+**Результаты экспериментов:**
+- ✅ Успешно загружал GOST engine на уровне OpenSSL
+- ✅ Работал без дополнительных Python зависимостей (кроме стандартных)
+- ✅ Исправлена проблема с segmentation fault (Python 3.12 совместимость)
+- ❌ **Не решал основную проблему:** Python ssl создает новый SSL_CTX, который не наследует загруженный engine
+- ❌ Подключение к сайтам только с GOST (dss.uc-em.ru) не работало через стандартный Python ssl
+
+**Вывод:**
+C extension успешно загружал GOST engine, но это не решало проблему, так как Python ssl модуль создает новый SSL_CTX при каждом вызове `ssl.create_default_context()`, который не наследует загруженный engine. Поэтому был удален в пользу финального решения - `gost_http` библиотеки.
+
+---
+
 ### 3. Модификация SSL контекста через ctypes после создания
 
 **Описание:** Создание SSL контекста через Python ssl, затем модификация через ctypes для добавления GOST engine.
@@ -372,6 +395,25 @@ response = requests.get('https://cryptopro.ru', verify=False, timeout=10)
 
 ---
 
+## Текущие результаты (обновлено)
+
+### Python C Extension (ЭКСПЕРИМЕНТАЛЬНЫЙ - УДАЛЕН)
+
+**Статус:** ❌ **УДАЛЕН** - экспериментальный код, который не решал основную проблему
+
+**Историческая справка:**
+- Был создан C extension `gost_engine_loader` в директории `gost_engine_loader/`
+- Extension успешно загружал GOST engine через OpenSSL API
+- Исправлена проблема с segmentation fault (проблема была в обработке `METH_NOARGS` в Python 3.12)
+
+**Проблема:**
+Даже после успешной загрузки GOST engine через C extension, Python `ssl.create_default_context()` все равно создавал новый `SSL_CTX`, который не наследует загруженный engine. Это фундаментальная архитектурная проблема Python ssl модуля.
+
+**Вывод:**
+C extension успешно загружал GOST engine на уровне OpenSSL, но это не помогало для Python ssl модуля, так как каждый SSL_CTX создается заново без наследования engine. Поэтому был удален в пользу финального решения - `gost_http` библиотеки.
+
+---
+
 ## Выводы
 
 **Основная проблема:** Python `ssl` модуль создает новый `SSL_CTX` при каждом вызове `ssl.create_default_context()`, который не наследует загруженный GOST engine из глобального контекста OpenSSL.
@@ -380,10 +422,85 @@ response = requests.get('https://cryptopro.ru', verify=False, timeout=10)
 - Для сайтов только с GOST: использовать прямой `SSL.Connection` через pyOpenSSL или `subprocess` с `curl`
 - Для смешанных сайтов: использовать стандартный `requests.get()`
 
-**Потенциальные улучшения:**
-- Создание Python C extension для автоматической загрузки GOST engine
-- Модификация Python ssl модуля (требует пересборки Python)
-- Использование альтернативных библиотек для SSL
+**Реализованные варианты:**
+- ❌ Python C extension для загрузки GOST engine (удален - не решал проблему с SSL_CTX)
+- ✅ pyOpenSSL с прямым `SSL.Connection` (работает для сайтов только с GOST)
+- ✅ subprocess с curl (работает для всех случаев)
+- ✅ **gost_http библиотека** (финальное решение - работает для всех случаев)
+
+**Следующие шаги:**
+- ✅ **РЕАЛИЗОВАНО:** Создание Python wrapper библиотеки `gost_http` с pyOpenSSL для универсального решения
+- ✅ **РЕАЛИЗОВАНО:** Создание `requests_gost` модуля для полной совместимости с requests API
+
+---
+
+## История изменений
+
+### 2024 - Эксперимент с C Extension (УДАЛЕН)
+
+**Создан Python C Extension `gost_engine_loader` (экспериментальный):**
+- Реализован модуль для загрузки GOST engine через OpenSSL API
+- Исправлена проблема с segmentation fault (проблема была в обработке `METH_NOARGS` в Python 3.12)
+- Создан Dockerfile для сборки образа с extension
+- Написаны тесты для проверки функциональности
+
+**Результаты:**
+- Extension успешно загружал GOST engine
+- Но не решал проблему с Python ssl модулем (SSL_CTX не наследует engine)
+
+**Вывод:** C extension работал, но не решал основную проблему. Был удален в пользу финального решения - `gost_http` библиотеки.
+
+---
+
+### 2024 - Реализация Python Wrapper библиотеки (ФИНАЛЬНОЕ РЕШЕНИЕ)
+
+**Создана библиотека `gost_http` с полной поддержкой GOST:**
+
+**Реализация:**
+- Создан модуль `gost_http` в директории `gost_http/`
+- Реализован `GOSTHTTPClient` класс с поддержкой всех HTTP методов (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+- Создан модуль `requests_gost` для полной совместимости с requests API
+- Автоматический выбор метода подключения:
+  1. Стандартный `requests.get()` через session с GOSTAdapter (для смешанных сайтов)
+  2. Прямой `pyOpenSSL SSL.Connection` (для сайтов только с GOST)
+  3. Fallback на `subprocess` с `curl` (последний вариант)
+
+**Результаты тестирования:**
+- ✅ Все HTTP методы работают (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+- ✅ Подключение к сайтам только с GOST (dss.uc-em.ru): работает
+- ✅ Подключение к смешанным сайтам (cryptopro.ru): работает
+- ✅ Полная совместимость с requests API через `requests_gost`
+- ✅ Простая миграция: `import requests_gost as requests`
+
+**Варианты использования:**
+
+1. **Простое использование:**
+```python
+from gost_http import gost_get, gost_post
+
+response = gost_get('https://dss.uc-em.ru/')
+response = gost_post('https://api.example.ru/', json={'key': 'value'})
+```
+
+2. **Использование сессий:**
+```python
+from gost_http import gost_session
+
+session = gost_session(verify=False, timeout=10)
+response = session.get('https://dss.uc-em.ru/')
+response = session.post('https://api.example.ru/', json={'data': 'value'})
+```
+
+3. **Полная замена requests (рекомендуется для миграции):**
+```python
+import requests_gost as requests
+
+# Весь код остается без изменений!
+response = requests.get('https://dss.uc-em.ru/')
+response = requests.post('https://api.example.ru/', json={'key': 'value'})
+```
+
+**Вывод:** Python wrapper библиотека `gost_http` является финальным рабочим решением для работы с GOST сайтами. Она полностью решает проблему и предоставляет простой способ миграции существующего кода.
 
 ---
 
@@ -393,4 +510,5 @@ response = requests.get('https://cryptopro.ru', verify=False, timeout=10)
 - [Python ssl модуль](https://docs.python.org/3/library/ssl.html)
 - [pyOpenSSL документация](https://www.pyopenssl.org/en/stable/)
 - [OpenSSL Engine API](https://www.openssl.org/docs/man3.0/man3/ENGINE_load_builtin_engines.html)
+
 

@@ -1,40 +1,38 @@
-.PHONY: build test clean run shell
+.PHONY: build test clean help
 
 IMAGE_NAME = python-gost-engine
 TAG = latest
 
+GOST_HTTP_VERSION ?= 0.1.0
+
+PYTHON_VERSION ?= 3.12
+
 build:
-	docker build -t $(IMAGE_NAME):$(TAG) .
+	@echo "Building Docker image $(IMAGE_NAME):$(TAG)..."
+	@echo "GOST HTTP version: $(GOST_HTTP_VERSION)"
+	@echo "Python version: $(PYTHON_VERSION)"
+	docker build \
+		-t $(IMAGE_NAME):$(TAG) .
+	@echo ""
+	@echo "=========================================="
+	@echo "Build completed successfully!"
+	@echo "=========================================="
 
 test:
-	docker run --rm $(IMAGE_NAME):$(TAG) python3 /app/tests/test_gost.py
-	docker run --rm $(IMAGE_NAME):$(TAG) python3 /app/tests/test_ssl.py
-
-test-mount:
-	docker run --rm -v $(PWD)/tests:/app/tests $(IMAGE_NAME):$(TAG) python3 /app/tests/test_gost.py
-
-run:
-	docker run --rm -it $(IMAGE_NAME):$(TAG) python3
-
-shell:
-	docker run --rm -it $(IMAGE_NAME):$(TAG) sh
-
-example:
-	docker run --rm -v $(PWD)/examples:/app/examples $(IMAGE_NAME):$(TAG) python3 /app/examples/basic_usage.py
+	@echo "Running gost_http tests..."
+	docker run --rm -v "$(PWD)/tests:/app/tests" $(IMAGE_NAME):$(TAG) python3 /app/tests/test_gost_http.py
 
 clean:
-	docker rmi $(IMAGE_NAME):$(TAG) || true
+	@echo "Removing Docker image $(IMAGE_NAME):$(TAG)..."
+	@docker rmi $(IMAGE_NAME):$(TAG) || true
+	@echo "Clean completed."
 
 help:
 	@echo "Available targets:"
-	@echo "  build       - Build Docker image"
-	@echo "  test        - Run test suite"
-	@echo "  test-mount  - Run tests with mounted volume"
-	@echo "  run         - Run Python interactive shell"
-	@echo "  shell       - Run system shell"
-	@echo "  example     - Run basic usage example"
-	@echo "  clean       - Remove Docker image"
-	@echo "  help        - Show this help message"
+	@echo "  build  - Build Docker image"
+	@echo "  test   - Run gost_http test suite"
+	@echo "  clean  - Remove Docker image"
+	@echo "  help   - Show this help message"
 
 
 
