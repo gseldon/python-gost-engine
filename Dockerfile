@@ -89,7 +89,6 @@ FROM python:${PYTHON_VERSION}-alpine AS final
 
 # Объявляем ARG для финальной стадии (не наследуются автоматически)
 ARG ALPINE_VERSION=3
-ARG PYTHON_VERSION=3.12
 ARG OPENSSL_VERSION
 ARG GOST_HTTP_VERSION=0.1.0
 
@@ -135,10 +134,5 @@ WORKDIR /app
 
 LABEL maintainer="36692159+gseldon@users.noreply.github.com"
 LABEL description="Python with GOST cryptographic support for OpenSSL"
-LABEL python.version="${PYTHON_VERSION}"
 LABEL alpine.version="${ALPINE_VERSION}"
 LABEL gost_http.version="${GOST_HTTP_VERSION}"
-
-
-
-

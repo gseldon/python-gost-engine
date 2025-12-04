@@ -47,7 +47,8 @@ jobs:
           # Extract Python version from Dockerfile and use as is (no modifications)
           # If PYTHON_VERSION=3.12, Docker will use the latest 3.12.x base image
           # If PYTHON_VERSION=3.12.14, Docker will use the specific 3.12.14 base image
-          PYTHON_VERSION=$(grep -E "^ARG PYTHON_VERSION=" Dockerfile | sed 's/ARG PYTHON_VERSION=//' | sed 's/^"//' | sed 's/"$//' | tr -d '[:space:]' || echo "3.12")
+          # Take only the first occurrence to avoid duplicates
+          PYTHON_VERSION=$(grep -E "^ARG PYTHON_VERSION=" Dockerfile | head -1 | sed 's/ARG PYTHON_VERSION=//' | sed 's/^"//' | sed 's/"$//' | tr -d '[:space:]' || echo "3.12")
           echo "PYTHON_VERSION=${PYTHON_VERSION}" >> $GITHUB_OUTPUT
           echo "Extracted Python version: ${PYTHON_VERSION}"
 
