@@ -1,6 +1,22 @@
 # Python с поддержкой GOST Cryptographic Engine
 
+[![Docker Image Version](https://img.shields.io/docker/v/gseldon/python-gost-engine?sort=semver&logo=docker)](https://hub.docker.com/r/gseldon/python-gost-engine)
+
 Docker образ и Python библиотека для работы с сайтами и сервисами, использующими российские криптографические стандарты GOST (GOST R 34.10-2012, GOST R 34.11-2012) в SSL/TLS соединениях.
+
+## Docker Hub
+
+Образ доступен на [Docker Hub](https://hub.docker.com/r/gseldon/python-gost-engine):
+
+```bash
+docker pull gseldon/python-gost-engine:latest
+```
+
+Или используйте конкретную версию:
+
+```bash
+docker pull gseldon/python-gost-engine:3.12-alpine-v0.1.0
+```
 
 Проект предоставляет готовое решение для разработчиков, которым необходимо работать с российскими сервисами, поддерживающими только GOST шифрование. Включает Docker образ с предустановленным Python и библиотеку `gost_http` для простой интеграции в существующие проекты.
 
