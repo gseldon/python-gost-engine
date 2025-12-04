@@ -44,11 +44,25 @@ jobs:
       - name: Extract Python version from Dockerfile
         id: extract_python_version
         run: |
-          PYTHON_VERSION=$(grep -E "^ARG PYTHON_VERSION=" Dockerfile | sed 's/ARG PYTHON_VERSION=//' | sed 's/^"//' | sed 's/"$//' || echo "3.12")
-          # Extract major.minor version (e.g., 3.12.0 -> 3.12)
-          PYTHON_VERSION_SHORT=$(echo "${PYTHON_VERSION}" | cut -d. -f1,2)
+          PYTHON_VERSION_RAW=$(grep -E "^ARG PYTHON_VERSION=" Dockerfile | sed 's/ARG PYTHON_VERSION=//' | sed 's/^"//' | sed 's/"$//' || echo "3.12")
+          # Check if version has patch part (e.g., 3.12.0, 3.12.4) or only major.minor (e.g., 3.12)
+          # Count dots in version: 3.12 has 1 dot, 3.12.0 has 2 dots
+          DOT_COUNT=$(echo "${PYTHON_VERSION_RAW}" | awk -F'.' '{print NF-1}')
+          if [ "${DOT_COUNT}" -eq 1 ]; then
+            # Only major.minor specified (e.g., 3.12), add .0 for build-args
+            PYTHON_VERSION_FULL="${PYTHON_VERSION_RAW}.0"
+          else
+            # Full version specified (e.g., 3.12.0, 3.12.4)
+            PYTHON_VERSION_FULL="${PYTHON_VERSION_RAW}"
+          fi
+          # Extract major.minor version for tag (e.g., 3.12.0 -> 3.12, 3.12.4 -> 3.12)
+          PYTHON_VERSION_SHORT=$(echo "${PYTHON_VERSION_FULL}" | cut -d. -f1,2)
+          # Use full version for build-args, short version for tag
+          echo "PYTHON_VERSION_FULL=${PYTHON_VERSION_FULL}" >> $GITHUB_OUTPUT
           echo "PYTHON_VERSION=${PYTHON_VERSION_SHORT}" >> $GITHUB_OUTPUT
-          echo "Extracted Python version: ${PYTHON_VERSION_SHORT}"
+          echo "Extracted Python raw version: ${PYTHON_VERSION_RAW}"
+          echo "Extracted Python full version: ${PYTHON_VERSION_FULL}"
+          echo "Extracted Python short version for tag: ${PYTHON_VERSION_SHORT}"
 
       - name: Set image metadata
         id: meta
@@ -68,7 +82,7 @@ jobs:
           context: .
           push: true
           build-args: |
-            PYTHON_VERSION=${{ steps.extract_python_version.outputs.PYTHON_VERSION }}.0
+            PYTHON_VERSION=${{ steps.extract_python_version.outputs.PYTHON_VERSION_FULL }}
             GOST_HTTP_VERSION=${{ steps.extract_version.outputs.GOST_HTTP_VERSION }}
             ALPINE_VERSION=3
           tags: ${{ steps.meta.outputs.tags }}
