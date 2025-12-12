@@ -116,6 +116,23 @@ from gost_http import GOSTHTTPClient
 
 client = GOSTHTTPClient(verify=False, timeout=10)
 response = client.get('https://dss.uc-em.ru/')
+
+# POST запросы с form data
+form_data = {
+    'grant_type': 'password',
+    'username': 'user@example.com',
+    'password': 'password'
+}
+headers = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Authorization': 'Basic ...'
+}
+response = client.post('https://dss.uc-em.ru/STS/oauth/token', 
+                       data=form_data, headers=headers)
+if response:
+    print(f"Status: {response.status_code}")
+    if response.status_code == 200:
+        token = response.json().get('access_token')
 ```
 
 Подробнее о библиотеке `gost_http` см. в [gost_http/README.md](gost_http/README.md).
@@ -156,6 +173,9 @@ python-gost-engine/
 - ✅ Автоматический выбор метода подключения (requests/pyOpenSSL/curl)
 - ✅ Работа с сайтами только с GOST cipher suites
 - ✅ Работа со смешанными сайтами (GOST + стандартные cipher suites)
+- ✅ Поддержка всех HTTP методов (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+- ✅ POST запросы с form data и JSON данными
+- ✅ Автоматический fallback на curl при ошибках SSL
 - ✅ Простой API, совместимый с `requests`
 - ✅ Docker образ с предустановленным окружением
 - ✅ Python библиотека для интеграции в существующие проекты
@@ -174,6 +194,7 @@ python-gost-engine/
 - `gost_requests_simple.py` - Простое использование функций
 - `gost_requests_session.py` - Использование сессий
 - `gost_requests_wrapper.py` - Замена импорта requests
+- `gost_requests_post.py` - POST запросы с form data и JSON
 
 ## Тестирование
 

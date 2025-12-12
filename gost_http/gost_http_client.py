@@ -242,6 +242,80 @@ def _fetch_via_curl(url: str, timeout: int = 10) -> Optional[Dict[str, Any]]:
         return None
 
 
+def _post_via_curl(url: str, data: Optional[Dict[str, Any]] = None, json: Optional[Dict[str, Any]] = None, 
+                   headers: Optional[Dict[str, str]] = None, timeout: int = 10) -> Optional[Dict[str, Any]]:
+    """
+    Отправляет POST запрос через subprocess с curl
+    
+    Args:
+        url: URL для запроса
+        data: Данные для отправки (form data)
+        json: JSON данные для отправки
+        headers: HTTP заголовки
+        timeout: Таймаут в секундах
+    
+    Returns:
+        Словарь с 'status_code', 'content', 'headers', 'text' или None при ошибке
+    """
+    try:
+        cmd = ['curl', '-k', '-s', '--connect-timeout', str(timeout), '-X', 'POST']
+        
+        # Добавляем заголовки
+        if headers:
+            for key, value in headers.items():
+                cmd.extend(['-H', f'{key}: {value}'])
+        
+        # Обрабатываем данные
+        if json:
+            # JSON данные
+            import json as json_module
+            json_str = json_module.dumps(json)
+            cmd.extend(['-H', 'Content-Type: application/json'])
+            cmd.extend(['-d', json_str])
+        elif data:
+            # Form data
+            if isinstance(data, dict):
+                # Если Content-Type не указан, добавляем application/x-www-form-urlencoded
+                if not headers or 'Content-Type' not in headers:
+                    cmd.extend(['-H', 'Content-Type: application/x-www-form-urlencoded'])
+                # Добавляем данные как -d параметры
+                for key, value in data.items():
+                    cmd.extend(['-d', f'{key}={value}'])
+            else:
+                # Строковые данные
+                cmd.extend(['-d', str(data)])
+        
+        # Добавляем URL
+        cmd.append(url)
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout + 5
+        )
+        
+        if result.returncode == 0:
+            # Пытаемся извлечь статус код из stderr (curl выводит его туда с -w)
+            status_code = 200
+            if result.stderr:
+                # Ищем HTTP статус в stderr
+                import re
+                status_match = re.search(r'HTTP/\d\.\d\s+(\d+)', result.stderr)
+                if status_match:
+                    status_code = int(status_match.group(1))
+            
+            return {
+                'status_code': status_code,
+                'content': result.stdout,
+                'headers': {},
+                'text': result.stdout
+            }
+        return None
+    except Exception:
+        return None
+
+
 class GOSTHTTPClient:
     """
     Универсальный HTTP клиент для работы с GOST сайтами
@@ -318,6 +392,9 @@ class GOSTHTTPClient:
                         **kwargs
                     )
                 except Exception:
+                    # Fallback на curl для POST/PUT/PATCH
+                    if method.upper() in ['POST', 'PUT', 'PATCH']:
+                        return self._post_via_curl(url, **kwargs)
                     return None
         except Exception:
             pass
@@ -363,6 +440,10 @@ class GOSTHTTPClient:
             # Fallback на curl для GET
             return self._get_via_curl(url)
         
+        # Fallback на curl для POST/PUT/PATCH
+        if method.upper() in ['POST', 'PUT', 'PATCH']:
+            return self._post_via_curl(url, **kwargs)
+        
         return None
     
     def get(self, url: str, **kwargs) -> Optional[Response]:
@@ -403,6 +484,28 @@ class GOSTHTTPClient:
                     self.text = text
                     self.status_code = status_code
                     self.headers = {}
+            
+            return MockResponse(result['content'], result['status_code'], result['text'])
+        return None
+    
+    def _post_via_curl(self, url: str, **kwargs) -> Optional[Response]:
+        """Отправляет POST запрос через curl"""
+        data = kwargs.get('data')
+        json_data = kwargs.get('json')
+        headers = kwargs.get('headers')
+        
+        result = _post_via_curl(url, data=data, json=json_data, headers=headers, timeout=self.timeout)
+        if result:
+            class MockResponse:
+                def __init__(self, content, status_code, text):
+                    self.content = content.encode() if isinstance(content, str) else content
+                    self.text = text
+                    self.status_code = status_code
+                    self.headers = {}
+                
+                def json(self):
+                    import json
+                    return json.loads(self.text)
             
             return MockResponse(result['content'], result['status_code'], result['text'])
         return None

@@ -32,4 +32,7 @@ Thumbs.db
 # Logs
 *.log
 
+# Тестовые файлы с критичными данными
+test_real_post.py
+
 
